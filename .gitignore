@@ -1,0 +1,13 @@
+# Maestro 실행 결과물
+*.png
+*.mp4
+.maestro/
+report/
+
+# macOS
+.DS_Store
+
+# Maestro 샘플 (maestro download-samples로 받은 파일, 직접 작성한 파일 아님)
+samples/
+*.apk
+*.zip
