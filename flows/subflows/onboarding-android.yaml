@@ -1,0 +1,19 @@
+appId: org.wikipedia
+---
+- launchApp:
+    clearState: true
+- tapOn:
+      text: "Non existent view"
+      optional: true
+- tapOn: "Forward|앞으로"
+- tapOn: "Forward|앞으로"
+- tapOn: "Forward|앞으로"
+- tapOn: 
+    text: "Skip|건너뛰기"    
+- assertVisible: "가장 많이 읽은 글"
+- assertVisible:
+    id: "org.wikipedia:id/nav_tab_home"
+    selected: true
+- assertVisible:
+    id: "org.wikipedia:id/nav_tab_search"
+    selected: true

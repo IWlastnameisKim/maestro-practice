@@ -58,10 +58,24 @@ maestro test flows/<flow 파일명>.yaml
 - [x] Maestro CLI 설치
 - [x] 지그재그 앱 에뮬레이터 실행 차단 확인 → 공식 샘플(위키피디아)로 전환
 - [x] 샘플 flow(`android-flow.yaml`, 앱 실행) 실행 성공으로 환경 검증
-- [ ] 샘플 advanced flow 분석
-- [ ] 첫 flow 직접 작성 및 실행
-- [ ] 실행 결과와 배운 점 정리
+- [x] 샘플 advanced flow 및 subflow 분석
+- [x] 첫 flow 작성: 온보딩 subflow를 다국어 대응·홈 탭 도착 검증으로 수정 ([flows/subflows/onboarding-android.yaml](flows/subflows/onboarding-android.yaml))
+- [ ] 검색 flow 작성
+
+## 작성한 flow
+
+| flow | 내용 | 검증 기준 |
+|---|---|---|
+| `onboarding-android.yaml` | 앱 데이터 초기화 후 온보딩 4단계 통과 | 하단 GNB 홈 탭이 선택된 상태(`id` + `selected: true`) |
 
 ## 배운 점
 
-flow 작성 후 정리 예정.
+자세한 과정은 [troubleshooting 7~9번](docs/troubleshooting.md)에 기록했습니다.
+
+- **셀렉터는 언어에 의존하지 않게.** 텍스트 셀렉터는 기기 언어가 바뀌면 깨진다. 우선순위는 id > 다국어 정규식(`"Forward|앞으로"`) > 단일 언어 텍스트 > 좌표.
+- **id가 없다면 testability 문제다.** 연습에서는 정규식으로 우회했지만, 실무라면 개발팀에 테스트용 id 추가를 요청하는 것이 근본 해결이다.
+- **hierarchy는 "그 순간의 화면"만 보여준다.** 요소를 못 찾으면, 그 스텝이 실행되는 시점의 화면에서 다시 확인한다.
+- **`optional`로 실패를 덮지 않는다.** optional은 팝업처럼 "있을 수도 없을 수도 있는" 요소에만 쓴다.
+- **변하는 콘텐츠가 아니라 변하지 않는 구조로 검증한다.** 피드 문구 대신 GNB의 id와 선택 상태로 "홈 도착"을 확인했다.
+- **확인 스텝은 fail도 확인한다.** 일부러 틀린 조건을 넣어 fail이 나는지 봐야, 그 스텝이 실제로 무언가를 잡아낼 수 있다는 걸 알 수 있다.
+- **웹 자동화 경험이 그대로 통한다.** 모바일 UI hierarchy도 웹 DOM과 같은 트리 구조라, Playwright에서 셀렉터를 잡던 방식이 그대로 적용됐다.
