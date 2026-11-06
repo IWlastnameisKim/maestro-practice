@@ -4,10 +4,13 @@
 .maestro/
 report/
 
-# macOS
-.DS_Store
-
 # Maestro 샘플 (maestro download-samples로 받은 파일, 직접 작성한 파일 아님)
 samples/
 *.apk
 *.zip
+
+# UI 구조 확인용 임시 파일
+hierarchy.json
+
+# macOS
+.DS_Store
