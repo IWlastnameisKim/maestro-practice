@@ -345,7 +345,42 @@ CI 에뮬레이터는 매번 새로 부팅된다. 부팅 직후에는 런처 등
 **확인**
 - 대기 조건 3개(부팅, 패키지 매니저, 런처 포커스)는 로컬 에뮬레이터에서 조건식이 맞게 판정되는 것을 확인. ANR 창 문자열을 넣으면 "대기 계속"으로 판정되는 것도 확인.
 - CI에서 실제로 해결됐는지는 **다음 workflow 실행 결과로 확인 필요.**
+- (2026-11-10 추가) 이후 CI 실행 3회 모두 테스트 직전 포커스가 `NexusLauncherActivity`이고 ANR 팝업 없이 시작함 → 해결 확인.
+  그 사이 실패 2회는 flow 쪽 문제(모음집 시트 닫기)였고 `docs/ai-review.md`에 기록.
 
 **배운 점**
 - 실패를 보면 먼저 **앱 실패 / flow 실패 / 환경 실패**로 분류한다. 환경 실패를 flow 수정으로 덮으면 진짜 결함까지 가려질 수 있다.
 - CI 에뮬레이터는 "부팅 완료" 신호만으로는 안정된 상태가 아니다. 테스트 전에 **시스템이 실제로 응답하는지**까지 확인한다.
+
+---
+
+## 12. CI 로그의 경고·ERROR 메시지 중 무시해도 되는 것
+
+**상황**
+CI sanity가 `[Passed]`로 끝났는데 로그 곳곳에 `ERROR`, `WARNING`, `failed with exit code 1`이 보여 실패로 오해하기 쉽다. (2026-11-10 실행 기준, 에뮬레이터 37.2.13 / API 34 / Maestro 2.12.1)
+
+**무시해도 되는 메시지**
+
+| 메시지 | 나오는 시점 | 의미 |
+|---|---|---|
+| `WARNING - ACTION REQUIRED … metrics-collection` | 에뮬레이터 시작 | 사용 통계 수집 동의 안내. `emulator-options`에 `-no-metrics`를 넣으면 사라진다 (현재는 넣지 않음) |
+| `ERROR Unable to connect to adb daemon on port: 5037` | 에뮬레이터 시작 | adb 서버가 아직 안 떠 있던 시점의 메시지. 곧 `daemon started successfully`가 나온다 |
+| `adb: device offline` / `…/adb' failed with exit code 1` | 부팅 대기 | emulator-runner가 부팅 중에 `sys.boot_completed`를 확인하다 받은 응답. 재시도 후 `Boot completed`까지 진행된다 |
+| `Feature QuickbootFileBacked is disabled` | 에뮬레이터 시작 | 스냅샷 관련 기능. `-no-snapshot`을 쓰므로 관계없다 |
+| `cannnot unmap ptr …` | 에뮬레이터 시작 | 에뮬레이터 내부 메모리 메시지 |
+| `Could not open libX11.so, try libX11.so.6` | 에뮬레이터 시작 | 화면 라이브러리를 다른 이름으로 다시 찾아 성공한다 (`-no-window`) |
+| `Failed to process .ini file … emu-update-last-check.ini` | 에뮬레이터 시작 | 업데이트 확인 기록 파일이 없다는 뜻 |
+| `WARNING: … sun.misc.Unsafe …` | Maestro 실행 | Maestro가 쓰는 Java 라이브러리(protobuf)의 경고 |
+| `ERROR stop: Not implemented`, `Emulator client has not yet been configured`, `Netsim Wifi … CANCELLED` | 에뮬레이터 종료 | 테스트가 끝난 뒤 종료 과정의 메시지 |
+| `DeprecationWarning: The punycode module …`, `url.parse()` | artifact 업로드 | `actions/upload-artifact` 내부 Node 경고 |
+
+**결과는 무엇으로 판단하나**
+1. **통과/실패**: `[Passed]` / `[Failed]` 줄, `n/n Flow Passed`, JUnit 리포트(`report/<스위트>.xml`)
+2. **실제로 검증했는지**: artifact의 `.maestro/tests/<시간>/<flow 이름>/commands.json`에서 각 스텝의 `status`를 본다.
+   - `runFlow` + `when` 블록은 조건이 맞지 않으면 `SKIPPED`인데도 flow 결과는 pass다.
+   - 예: `article-save.yaml`은 '새로 들어온 소식' 블록이 `COMPLETED`여야 저장·확인·삭제를 실제로 검증한 것이다. (툴팁 닫기 블록은 `SKIPPED`가 정상)
+3. **어떤 데이터로 테스트했는지**: `maestro.log`의 `JsConsole: [savedTitle] 원문: …`
+
+**배운 점**
+- 로그의 `ERROR`/`WARNING` 단어가 아니라 **테스트 결과 줄과 스텝 상태**로 판단한다.
+- 반대로, 처음 보는 메시지가 실패 직전에 나왔다면 이 표에 없는지 확인하고, 새로 확인한 것은 이 표에 추가한다.
