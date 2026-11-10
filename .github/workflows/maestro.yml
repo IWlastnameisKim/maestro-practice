@@ -107,6 +107,10 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # 환경 실패 대응 (docs/troubleshooting.md 11번)
+      #   부팅 직후 시스템 앱(런처 등)이 아직 무거운 상태에서 테스트를 시작하면
+      #   "Pixel Launcher isn't responding" 같은 시스템 팝업이 앱 화면을 가려 assert가 실패한다.
+      #   → ① 자원을 늘리고 ② 시스템이 안정될 때까지 기다리고 ③ 오류 팝업 자체를 끈다.
       - name: 에뮬레이터에서 ${{ needs.prepare.outputs.suite }} 실행
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -114,9 +118,33 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_6
+          # [안정] 기본값(코어 2, RAM 2GB)은 부팅 직후 런처가 응답하지 못할 만큼 빠듯하다.
+          cores: 4
+          ram-size: 4096M
+          emulator-boot-timeout: 900
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          # [팝업] 맞춤법 검사 안내 등 입력 관련 시스템 UI가 뜨지 않게 한다.
+          disable-spellchecker: true
+          # [안정] 카메라 가상 장치는 쓰지 않으므로 꺼서 부팅 부하를 줄인다.
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
+          # emulator-runner는 script를 한 줄씩 따로 실행하고, 한 줄이라도 실패하면 단계가 실패한다.
           script: |
+            echo "== [안정 1] 부팅 완료 + 부팅 애니메이션 종료 대기 (최대 5분)"
+            timeout 300 sh -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ] && [ "$(adb shell getprop init.svc.bootanim | tr -d "\r")" = "stopped" ]; do sleep 2; done'
+            echo "== [안정 2] 패키지 매니저 응답 대기 (설치·실행 명령을 받을 수 있는 상태)"
+            timeout 120 sh -c 'until adb shell pm path android >/dev/null 2>&1; do sleep 2; done'
+            echo "== [팝업] 시스템 오류·응답 없음(ANR) 팝업 끄기"
+            adb shell settings put global hide_error_dialogs 1
+            adb shell settings put secure anr_show_background 0
+            echo "== [안정 3] 홈으로 이동 후 런처가 정상 응답(포커스)할 때까지 대기 (최대 2분)"
+            adb shell input keyevent KEYCODE_HOME
+            timeout 120 sh -c 'until adb shell dumpsys window | grep mCurrentFocus | grep -i launcher | grep -viq "not responding"; do sleep 3; adb shell input keyevent KEYCODE_HOME; done'
+            echo "== [안정 4] 부팅 직후 백그라운드 작업이 가라앉도록 30초 대기"
+            sleep 30
+            echo "== [팝업] 이미 떠 있는 시스템 팝업이 있으면 닫기"
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            echo "== 테스트 직전 화면 포커스 (로그 확인용)"
+            adb shell dumpsys window | grep mCurrentFocus
             adb install -r app.apk
             adb shell dumpsys package org.wikipedia | grep versionName
             npm run test:${{ needs.prepare.outputs.suite }}
