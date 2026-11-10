@@ -84,6 +84,12 @@ tags:
           timeout: 5000
       - tapOn:
           id: "org.wikipedia:id/touch_outside"
+      # 시트가 완전히 닫히기 전에 back을 누르면 back이 시트 닫기에 쓰여 홈까지 돌아오지 못한다.
+      # (2026-11-10 CI: 느린 에뮬레이터에서 back 1번째가 시트를 닫고, 뉴스 상세에서 멈춰 실패)
+      - extendedWaitUntil:
+          notVisible:
+            id: "org.wikipedia:id/touch_outside"
+          timeout: 5000
 
       # 4. '저장됨' 탭에서 저장한 기사 확인
       #    기사 페이지 → 뉴스 상세 → 홈으로 돌아가야 하단 탭이 보인다.
