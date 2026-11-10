@@ -1,0 +1,11 @@
+[
+  {
+    "id": "r50606",
+    "versionName": "r/50606-r-2026-09-09",
+    "versionCode": 50606,
+    "apkUrl": "https://github.com/IWlastnameisKim/maestro-practice/releases/download/app-r50606/wikipedia-r50606.apk",
+    "sha256": "eba82a0f77940d8a6be5bd2e53723675a59859a6c8a51be5e50bd034fc77101f",
+    "enabled": true,
+    "note": "로컬 에뮬레이터와 같은 버전. 원본: maestro download-samples의 samples/wikipedia.apk"
+  }
+]

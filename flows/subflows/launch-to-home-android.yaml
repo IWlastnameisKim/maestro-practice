@@ -1,0 +1,22 @@
+appId: org.wikipedia
+---
+# 초기 상태 진입: 앱 초기화 → 온보딩 통과 → 메인 홈 도착 확인
+# 원본: samples/subflows/onboarding-android.yaml (영어 전용 → 영어/한국어로 수정, 의미 없는 스텝 제거, 홈 도착 확인 추가)
+#
+# 문구 출처: 설치된 앱(r/50606-r-2026-09-09)의 문자열 리소스 en / ko
+#   nav_item_forward  "Forward" / "앞으로"   (온보딩 1~3페이지의 다음 버튼, accessibilityText)
+#   onboarding_skip   "Skip"    / "건너뛰기" (온보딩 마지막 페이지에만 있음 → docs/troubleshooting.md 8번)
+
+# 1. 앱 데이터 초기화 후 실행 → 온보딩 첫 화면 확인
+- runFlow: launch-clearstate-android.yaml
+
+# 2. 온보딩 통과
+- tapOn: "Forward|앞으로"
+- tapOn: "Forward|앞으로"
+- tapOn: "Forward|앞으로"
+- tapOn: "Skip|건너뛰기"
+
+# 3. 메인 홈 도착 확인 (피드 문구가 아니라 하단 탭 구조로 확인)
+- assertVisible:
+    id: "org.wikipedia:id/nav_tab_home"
+    selected: true

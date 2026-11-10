@@ -1,0 +1,12 @@
+{
+  "name": "maestro-practice",
+  "private": true,
+  "description": "Maestro UI tests for the Wikipedia Android app",
+  "scripts": {
+    "test:sanity": "mkdir -p report && maestro test flows --include-tags=sanity --format=junit --output=report/sanity.xml --test-suite-name=sanity",
+    "test:regression": "mkdir -p report && maestro test flows --include-tags=regression --format=junit --output=report/regression.xml --test-suite-name=regression",
+    "test:tag": "maestro test flows --include-tags",
+    "list:suites": "node tools/suites.mjs",
+    "check:suites": "node tools/suites.mjs --check"
+  }
+}

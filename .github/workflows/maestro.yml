@@ -1,0 +1,137 @@
+name: Maestro UI tests
+
+# 실행 시점
+#   - PR            → sanity
+#   - 매일 03:00 KST → regression
+#   - 수동 실행       → 스위트·앱 버전 선택
+on:
+  pull_request:
+  schedule:
+    - cron: "0 18 * * *" # UTC 18:00 = KST 03:00
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 실행할 스위트
+        type: choice
+        options: [sanity, regression]
+        default: sanity
+      app_version:
+        description: "ci/app-versions.json의 id (all = enabled 전체)"
+        type: string
+        default: all
+
+concurrency:
+  group: maestro-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MAESTRO_VERSION: "2.12.1" # 로컬과 같은 버전으로 고정
+  EMULATOR_API_LEVEL: 34 # 로컬은 API 37(arm64). CI 러너는 x86_64라 안정적인 34를 쓴다.
+
+jobs:
+  # 1) 사전 검사: 태깅 규칙, YAML 문법 → 실행할 스위트·앱 버전 결정
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      suite: ${{ steps.plan.outputs.suite }}
+      versions: ${{ steps.plan.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: 태깅 규칙 검사
+        run: npm run check:suites
+
+      # flow 하나라도 파싱에 실패하면 스위트 전체가 시작되지 않으므로 먼저 확인한다.
+      - name: YAML 문법 검사
+        run: |
+          find flows -name "*.yaml" ! -name config.yaml -print0 |
+            xargs -0 -n1 sh -c 'echo "check $0" && maestro check-syntax "$0"'
+
+      - name: 실행 계획
+        id: plan
+        env:
+          INPUT_SUITE: ${{ inputs.suite }}
+          INPUT_VERSION: ${{ inputs.app_version }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ -n "$INPUT_SUITE" ]; then suite="$INPUT_SUITE"
+          elif [ "$EVENT" = "schedule" ]; then suite=regression
+          else suite=sanity; fi
+          echo "suite=$suite" >> "$GITHUB_OUTPUT"
+
+          node -e '
+            const sel = process.env.INPUT_VERSION || "all";
+            const all = require("./ci/app-versions.json");
+            const v = all.filter(a => a.enabled !== false && (sel === "all" || a.id === sel));
+            if (!v.length) { console.error(`앱 버전 "${sel}"을 찾을 수 없음`); process.exit(1); }
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `versions=${JSON.stringify(v)}\n`);
+            console.log(`versions=${v.map(a => a.id).join(",")}`);
+          '
+        shell: bash
+
+  # 2) 앱 버전마다 에뮬레이터를 띄워 스위트 실행 (버전이 늘어나면 병렬로 늘어난다)
+  test:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.prepare.outputs.versions) }}
+    name: ${{ needs.prepare.outputs.suite }} · ${{ matrix.app.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: APK 다운로드 및 검증 (${{ matrix.app.versionName }})
+        env:
+          APK_URL: ${{ matrix.app.apkUrl }}
+          APK_SHA256: ${{ matrix.app.sha256 }}
+        run: |
+          curl -fsSL -o app.apk "$APK_URL"
+          echo "$APK_SHA256  app.apk" | sha256sum -c -
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 에뮬레이터에서 ${{ needs.prepare.outputs.suite }} 실행
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.EMULATOR_API_LEVEL }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: |
+            adb install -r app.apk
+            adb shell dumpsys package org.wikipedia | grep versionName
+            npm run test:${{ needs.prepare.outputs.suite }}
+
+      - name: 리포트 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-${{ needs.prepare.outputs.suite }}-${{ matrix.app.id }}
+          path: |
+            report/
+            ~/.maestro/tests/
+          if-no-files-found: warn

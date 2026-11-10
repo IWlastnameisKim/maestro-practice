@@ -1,0 +1,23 @@
+appId: org.wikipedia
+---
+# 검색 탭에 처음 들어가면 뜨는 '검색 위젯 설치' 바텀시트를 닫는다.
+# 원본: samples/android-advanced-flow.yaml 안의 when 블록 (영어 전용 → 영어/한국어로 수정, 닫힘 확인 추가)
+# 호출 시점: 검색 탭(nav_tab_search)을 누른 직후
+#
+# 문구 출처: 설치된 앱(r/50606-r-2026-09-09)의 문자열 리소스 en / ko
+#   search_widget_install_prompt_title  "A Faster way to Search" / "더 빠른 검색 방법"
+# 바텀시트 제목에는 resource-id가 없다 → 다국어 텍스트로 판단
+
+# 바텀시트가 올라오는 중에 when을 평가하면 '없음'으로 판단해 건너뛸 수 있어 먼저 대기
+- waitForAnimationToEnd
+
+- runFlow:
+    when:
+      visible: "A Faster way to Search|더 빠른 검색 방법"
+    label: 검색 위젯 프로모션 바텀시트가 떠 있으면 닫기
+    commands:
+      # touch_outside는 화면 전체를 덮는 바텀시트 바깥 영역이다.
+      # 요소 중앙(화면 중앙)을 탭하며, 이 위치는 바텀시트 위쪽 빈 영역이라 시트가 닫힌다.
+      - tapOn:
+          id: "org.wikipedia:id/touch_outside"
+      - assertNotVisible: "A Faster way to Search|더 빠른 검색 방법"

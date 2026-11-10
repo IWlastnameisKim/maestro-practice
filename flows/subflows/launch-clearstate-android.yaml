@@ -1,0 +1,13 @@
+appId: org.wikipedia
+---
+# 앱 데이터 초기화 후 실행 → 온보딩 첫 화면 도착 확인
+# 원본: samples/subflows/launch-clearstate-android.yaml (영어 전용 → 영어/한국어로 수정)
+#
+# 문구 출처: 설치된 앱(r/50606-r-2026-09-09)의 문자열 리소스 en / ko
+#   onboarding_fresh_install_knowledge_title       "All the world's knowledge"   / "세상의 모든 지식"
+#   onboarding_fresh_install_knowledge_learn_more  "Learn more about Wikipedia"  / "위키백과에 대해 더 알아보기"
+# 온보딩 화면은 Compose로 그려져 resource-id가 없다 → 다국어 텍스트로 확인 (docs/ai-review.md 기록)
+- launchApp:
+    clearState: true
+- assertVisible: "All the world's knowledge|세상의 모든 지식"
+- assertVisible: "Learn more about Wikipedia|위키백과에 대해 더 알아보기"

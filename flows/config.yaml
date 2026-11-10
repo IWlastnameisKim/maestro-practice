@@ -1,0 +1,7 @@
+# Maestro 워크스페이스 설정
+# - 기능별 하위 폴더(search/, saved/ …)까지 모두 탐색한다.
+# - 어떤 flow를 실행할지는 태그로 고른다 (package.json 참고).
+# - 주의: 태그 없이 `maestro test flows`를 실행하면 subflows/까지 단독 실행된다.
+#   그래서 실행은 항상 npm 스크립트(태그 지정)로 한다.
+flows:
+  - "**"

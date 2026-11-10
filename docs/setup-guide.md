@@ -58,12 +58,24 @@ xcode-select --install
    - `Google APIs`만 있는 이미지에는 Play 스토어가 없다.
 5. Finish → 목록에서 ▶ 로 실행
 
-## 6. 대상 앱 설치
+## 6. 대상 앱(위키피디아) 설치
 
-1. 에뮬레이터에서 Play 스토어 실행 → Google 계정 로그인
-2. 앱 검색 후 설치
-   - 에뮬레이터 기본 키보드에서 한글 입력이 안 되면 영문으로 검색한다. (예: `zigzag`)
-   - 한글 입력이 필요하면: 설정 → System → Languages & input → On-screen keyboard → Gboard → Languages → 한국어 추가
+Play 스토어가 아니라 **버전이 고정된 APK**를 설치한다. CI와 같은 버전으로 테스트하기 위해서다. (버전 목록: `ci/app-versions.json`)
+
+Maestro 설치(8단계) 후, 프로젝트 폴더에서:
+```bash
+maestro download-samples
+adb install -r samples/wikipedia.apk
+```
+
+확인 — `ci/app-versions.json`의 `versionName`, `sha256`과 같아야 한다:
+```bash
+adb shell dumpsys package org.wikipedia | grep versionName
+shasum -a 256 samples/wikipedia.apk
+```
+
+- 에뮬레이터 기본 키보드에서 한글 입력이 안 될 수 있다. 검색어는 영문으로 시작한다.
+- 한글 입력이 필요하면: 설정 → System → Languages & input → On-screen keyboard → Gboard → Languages → 한국어 추가
 
 ## 7. adb 연결
 
@@ -99,7 +111,7 @@ maestro --version
 flow 파일 상단의 `appId`에 들어갈 값이다.
 
 ```bash
-adb shell pm list packages | grep -i zigzag
+adb shell pm list packages | grep -i wikipedia
 ```
 
 결과가 없으면, 앱을 화면에 띄운 상태에서:
@@ -107,6 +119,20 @@ adb shell pm list packages | grep -i zigzag
 adb shell dumpsys window | grep -E 'mCurrentFocus'
 ```
 출력에서 `/` 앞부분이 패키지명이다.
+
+## 10. Node.js 설치 (실행 명령용)
+
+스위트 실행(`npm run test:sanity` 등)과 태깅 규칙 검사(`tools/suites.mjs`)에 쓴다. 테스트 자체는 Maestro가 실행한다.
+
+```bash
+brew install node
+```
+
+확인:
+```bash
+node --version
+npm run check:suites
+```
 
 ---
 

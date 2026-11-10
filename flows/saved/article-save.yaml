@@ -1,0 +1,99 @@
+appId: org.wikipedia
+name: 새로 들어온 소식 기사 저장 → 저장됨 목록 확인 → 저장 해제
+tags:
+  - android
+  - sanity
+  - regression
+  - saved
+---
+# 흐름: 홈 '새로 들어온 소식' 카드 → 뉴스 상세 → 첫 번째 관련 기사 → 저장
+#       → '저장됨' 탭에서 그 기사 확인 → 저장 해제 → 목록에서 사라졌는지 확인
+#
+# 셀렉터 출처 (2026-11-10, 앱 r/50606, maestro hierarchy + 앱 문자열 리소스 en/ko로 확인)
+#   view_card_news_title             "In the news"        / "새로 들어온 소식"
+#   explore_feed_in_the_news_subtitle  카드 설명 문구 (아래 below 기준점)
+#   customize_toolbar_title          "Customize toolbar"  / "도구 모음 사용자 지정"
+#   id: view_list_card_item_title    뉴스 상세의 관련 기사 제목
+#   id: page_save                    기사 하단 '저장' 버튼
+#   id: nav_tab_reading_lists        하단 '저장됨' 탭
+#   id: reading_list_item_remove     길게 누르기 메뉴의 '저장됨에서 제거하기'
+#   id: snackbar_text                제거 후 스낵바
+# 기사 제목은 매일 바뀌므로 하드코딩하지 않고 copyTextFrom으로 읽어서 사용한다.
+
+- runFlow: ../subflows/onboarding-android.yaml
+
+# '새로 들어온 소식' 카드는 날에 따라 없을 수 있어 스크롤로 찾는다.
+- scrollUntilVisible:
+    element: "In the news|새로 들어온 소식"
+    direction: DOWN
+    timeout: 20000
+    optional: true
+
+- runFlow:
+    when:
+      visible: "In the news|새로 들어온 소식"
+    label: 새로 들어온 소식 카드가 있을 때만 저장 시나리오 실행
+    commands:
+      # 1. 뉴스 상세 열기
+      #    피드 카드는 Compose로 그려져 resource-id가 없고 기사 문구는 매일 바뀐다.
+      #    → 고정 문구인 카드 설명 바로 아래의 첫 요소(= 뉴스 본문)를 탭한다. (docs/ai-review.md 기록)
+      - tapOn:
+          text: ".+"
+          below: "Articles that have been substantially updated to reflect recent or current events of wide interest|최근 또는 현재 발생하고 있는 광범위한 관심 사건을 반영하여 대폭 업데이트된 문서"
+      - extendedWaitUntil:
+          visible:
+            id: "org.wikipedia:id/view_list_card_item_title"
+          timeout: 15000
+
+      # 2. 첫 번째 관련 기사 제목을 읽어 두고 기사로 이동
+      - copyTextFrom:
+          id: "org.wikipedia:id/view_list_card_item_title"
+          index: 0
+      - evalScript: ${output.savedTitle = maestro.copiedText}
+      - tapOn:
+          id: "org.wikipedia:id/view_list_card_item_title"
+          index: 0
+      - extendedWaitUntil:
+          visible:
+            id: "org.wikipedia:id/page_save"
+          timeout: 15000
+
+      # 첫 기사 진입 시 뜨는 '도구 모음 사용자 지정' 툴팁 (뜨지 않을 수도 있음)
+      - runFlow:
+          when:
+            visible: "Customize toolbar|도구 모음 사용자 지정"
+          label: 도구 모음 툴팁이 떠 있으면 닫기
+          commands:
+            - tapOn:
+                id: "org.wikipedia:id/buttonView"
+
+      # 3. 저장
+      - tapOn:
+          id: "org.wikipedia:id/page_save"
+      # 저장 직후 '모음집에 추가' 바텀시트가 뜬다. 바깥 영역(touch_outside)을 탭해 닫는다.
+      - extendedWaitUntil:
+          visible:
+            id: "org.wikipedia:id/touch_outside"
+          timeout: 5000
+      - tapOn:
+          id: "org.wikipedia:id/touch_outside"
+
+      # 4. '저장됨' 탭에서 저장한 기사 확인
+      #    기사 페이지 → 뉴스 상세 → 홈으로 돌아가야 하단 탭이 보인다.
+      - pressKey: back
+      - pressKey: back
+      - tapOn:
+          id: "org.wikipedia:id/nav_tab_reading_lists"
+      - assertVisible:
+          id: "org.wikipedia:id/nav_tab_reading_lists"
+          selected: true
+      # 목록 항목은 Compose라 id가 없어 제목 텍스트로 확인한다.
+      - assertVisible: ${output.savedTitle}
+
+      # 5. 정리: 저장 해제 → 목록에서 사라졌는지 확인
+      - longPressOn: ${output.savedTitle}
+      - tapOn:
+          id: "org.wikipedia:id/reading_list_item_remove"
+      - assertVisible:
+          id: "org.wikipedia:id/snackbar_text"
+      - assertNotVisible: ${output.savedTitle}
