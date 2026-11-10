@@ -45,7 +45,7 @@
 
 ## CI (GitHub Actions)
 
-- workflow: `.github/workflows/maestro.yml` — PR → sanity, 매일 03:00 KST → regression, 수동 실행 시 스위트·버전 선택
+- workflow: `.github/workflows/maestro.yml` — PR → sanity, 수동 실행 시 스위트·버전 선택 (정기 실행 schedule은 두지 않는다)
 - 순서: 태깅 규칙 검사 → 전체 YAML 문법 검사 → **앱 버전별로** 에뮬레이터 실행 (matrix, 병렬)
 - 앱 버전은 **고정**한다. 목록: `ci/app-versions.json` (`enabled: true`인 버전이 모두 실행된다)
 - APK는 커밋하지 않고 이 저장소의 GitHub Release(`app-<id>` 태그)에 올린 뒤, `sha256`으로 같은 파일인지 검증한다.

@@ -91,8 +91,9 @@ npm run check:suites
 | 시점 | 스위트 |
 |---|---|
 | PR | sanity |
-| 매일 03:00 KST | regression |
-| 수동 실행 | 스위트·앱 버전 선택 |
+| 수동 실행 (Actions 탭 → Run workflow) | 스위트(sanity / regression)·앱 버전 선택 |
+
+> 혼자 쓰는 학습용 저장소라 정기 실행(schedule)은 두지 않았습니다.
 
 태깅 규칙 검사 → 전체 YAML 문법 검사 → `ci/app-versions.json`의 **앱 버전마다** 에뮬레이터를 띄워 병렬 실행합니다. APK는 커밋하지 않고 이 저장소의 GitHub Release(`app-<id>` 태그)에 올린 뒤 sha256으로 검증합니다.
 

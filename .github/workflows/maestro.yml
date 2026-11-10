@@ -1,13 +1,10 @@
 name: Maestro UI tests
 
 # 실행 시점
-#   - PR            → sanity
-#   - 매일 03:00 KST → regression
-#   - 수동 실행       → 스위트·앱 버전 선택
+#   - PR       → sanity
+#   - 수동 실행  → 스위트(sanity / regression)·앱 버전 선택
 on:
   pull_request:
-  schedule:
-    - cron: "0 18 * * *" # UTC 18:00 = KST 03:00
   workflow_dispatch:
     inputs:
       suite:
@@ -60,11 +57,9 @@ jobs:
         env:
           INPUT_SUITE: ${{ inputs.suite }}
           INPUT_VERSION: ${{ inputs.app_version }}
-          EVENT: ${{ github.event_name }}
         run: |
-          if [ -n "$INPUT_SUITE" ]; then suite="$INPUT_SUITE"
-          elif [ "$EVENT" = "schedule" ]; then suite=regression
-          else suite=sanity; fi
+          # 수동 실행이면 선택한 스위트, PR이면 sanity
+          suite="${INPUT_SUITE:-sanity}"
           echo "suite=$suite" >> "$GITHUB_OUTPUT"
 
           node -e '
