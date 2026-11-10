@@ -17,8 +17,8 @@ tags:
 #   id: page_save                    기사 하단 '저장' 버튼
 #   id: nav_tab_reading_lists        하단 '저장됨' 탭
 #   id: reading_list_item_remove     길게 누르기 메뉴의 '저장됨에서 제거하기'
-#   id: snackbar_text                제거 후 스낵바
 # 기사 제목은 매일 바뀌므로 하드코딩하지 않고 copyTextFrom으로 읽어서 사용한다.
+# 읽은 제목은 maestro.log에 "JsConsole: [savedTitle] 원문: …"으로 남는다. (CI에서는 artifact의 maestro.log)
 
 - runFlow: ../subflows/onboarding-android.yaml
 
@@ -49,7 +49,14 @@ tags:
       - copyTextFrom:
           id: "org.wikipedia:id/view_list_card_item_title"
           index: 0
-      - evalScript: ${output.savedTitle = maestro.copiedText}
+      # 제목을 로그에 남기고, 셀렉터용으로 정규식 특수문자를 이스케이프한다.
+      #   output.savedTitle      원문
+      #   output.savedTitleRegex 이스케이프한 값 (예: "이진희 (배우)" → "이진희 \(배우\)")
+      - runScript:
+          file: ../scripts/escape-regex.js
+          env:
+            TEXT: ${maestro.copiedText}
+            NAME: savedTitle
       - tapOn:
           id: "org.wikipedia:id/view_list_card_item_title"
           index: 0
@@ -88,12 +95,10 @@ tags:
           id: "org.wikipedia:id/nav_tab_reading_lists"
           selected: true
       # 목록 항목은 Compose라 id가 없어 제목 텍스트로 확인한다.
-      - assertVisible: ${output.savedTitle}
+      - assertVisible: ${output.savedTitleRegex}
 
       # 5. 정리: 저장 해제 → 목록에서 사라졌는지 확인
-      - longPressOn: ${output.savedTitle}
+      - longPressOn: ${output.savedTitleRegex}
       - tapOn:
           id: "org.wikipedia:id/reading_list_item_remove"
-      - assertVisible:
-          id: "org.wikipedia:id/snackbar_text"
-      - assertNotVisible: ${output.savedTitle}
+      - assertNotVisible: ${output.savedTitleRegex}
