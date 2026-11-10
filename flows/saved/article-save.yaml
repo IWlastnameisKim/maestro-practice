@@ -77,15 +77,16 @@ tags:
       # 3. 저장
       - tapOn:
           id: "org.wikipedia:id/page_save"
-      # 저장 직후 '모음집에 추가' 바텀시트가 뜬다. 바깥 영역(touch_outside)을 탭해 닫는다.
+      # 저장 직후 '모음집에 추가' 바텀시트가 뜬다. back으로 닫는다.
+      #   touch_outside를 탭하지 않는 이유: touch_outside는 화면 거의 전체 크기라 Maestro가 탭하는
+      #   가운데 지점이 기기에 따라 시트 안에 떨어진다. (2026-11-10 CI pixel_6: 가운데 y=1232, 시트 시작 y=1138
+      #   → 시트가 닫히지 않음)
       - extendedWaitUntil:
           visible:
             id: "org.wikipedia:id/touch_outside"
           timeout: 5000
-      - tapOn:
-          id: "org.wikipedia:id/touch_outside"
-      # 시트가 완전히 닫히기 전에 back을 누르면 back이 시트 닫기에 쓰여 홈까지 돌아오지 못한다.
-      # (2026-11-10 CI: 느린 에뮬레이터에서 back 1번째가 시트를 닫고, 뉴스 상세에서 멈춰 실패)
+      - pressKey: back
+      # 시트가 닫혔는지 확인한다. 닫히지 않으면 다음 back이 시트 닫기에 쓰여 홈까지 돌아오지 못한다.
       - extendedWaitUntil:
           notVisible:
             id: "org.wikipedia:id/touch_outside"
