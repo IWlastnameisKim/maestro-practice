@@ -49,6 +49,7 @@ maestro-practice/
 ├── docs/
 │   ├── setup-guide.md           # 환경 구성 가이드 (처음부터 재현용)
 │   ├── troubleshooting.md       # 겪은 문제와 해결 기록
+│   ├── ci-workflow.md           # CI workflow 해설 (버전 고정, job 간 값 전달, 문법 검사 명령)
 │   └── ai-review.md             # AI 작성 flow 리뷰 기록 / testability·앱 결함 후보
 ├── CLAUDE.md                    # AI 협업 규칙 (셀렉터·검증·태깅 규칙)
 ├── package.json                 # 스위트별 실행 명령
@@ -109,6 +110,8 @@ CI 결과는 이렇게 확인합니다.
 1. **통과/실패**: `[Passed]` / `[Failed]` 줄과 JUnit 리포트. 로그의 `ERROR`·`WARNING` 대부분은 에뮬레이터·도구 메시지다 ([troubleshooting 12번](docs/troubleshooting.md)).
 2. **실제로 검증했는지**: artifact의 `commands.json`에서 `when` 블록이 `SKIPPED`가 아닌지 본다.
 3. **실패 원인**: 실패 스크린샷 → `commands.json`(어느 스텝) → logcat(앱 화면 전환 기록) 순서로 좁힌다.
+
+workflow 파일의 각 부분이 무엇을 하는지는 [docs/ci-workflow.md](docs/ci-workflow.md)에 풀어 두었습니다.
 
 ## 진행 상황
 
