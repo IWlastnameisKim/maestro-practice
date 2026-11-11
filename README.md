@@ -41,7 +41,8 @@ maestro-practice/
 │   ├── config.yaml              # 하위 폴더까지 탐색 (flows: ["**"])
 │   ├── saved/                   # 기능별 테스트 본체 (태그로 스위트 지정)
 │   │   └── article-save.yaml
-│   └── subflows/                # 초기 조건 세팅용 재사용 flow (단독 실행 안 함)
+│   ├── subflows/                # 초기 조건 세팅용 재사용 flow (단독 실행 안 함)
+│   └── scripts/                 # runScript로 호출하는 JS (예: escape-regex.js)
 ├── tools/suites.mjs             # 스위트 구성 표 출력 / 태깅 규칙 검사
 ├── ci/app-versions.json         # CI에서 테스트할 앱 버전 목록 (APK URL + sha256)
 ├── .github/workflows/maestro.yml
@@ -97,6 +98,18 @@ npm run check:suites
 
 태깅 규칙 검사 → 전체 YAML 문법 검사 → `ci/app-versions.json`의 **앱 버전마다** 에뮬레이터를 띄워 병렬 실행합니다. APK는 커밋하지 않고 이 저장소의 GitHub Release(`app-<id>` 태그)에 올린 뒤 sha256으로 검증합니다.
 
+| 항목 | 내용 |
+|---|---|
+| CI 에뮬레이터 | API 34, x86_64, `google_apis`, `pixel_6` (1080×2400), **언어 영어** (로컬은 한국어 → 텍스트 셀렉터는 영어·한국어 함께) |
+| 테스트 전 안정화 | 부팅·패키지 매니저·런처 응답 대기, 시스템 오류·ANR 팝업 끄기 ([troubleshooting 11번](docs/troubleshooting.md)) |
+| 결과물 (artifact) | `maestro-<스위트>-<버전 id>`: JUnit 리포트, 스텝별 상태(`commands.json`), 실패 스크린샷, `maestro.log`, logcat |
+
+CI 결과는 이렇게 확인합니다.
+
+1. **통과/실패**: `[Passed]` / `[Failed]` 줄과 JUnit 리포트. 로그의 `ERROR`·`WARNING` 대부분은 에뮬레이터·도구 메시지다 ([troubleshooting 12번](docs/troubleshooting.md)).
+2. **실제로 검증했는지**: artifact의 `commands.json`에서 `when` 블록이 `SKIPPED`가 아닌지 본다.
+3. **실패 원인**: 실패 스크린샷 → `commands.json`(어느 스텝) → logcat(앱 화면 전환 기록) 순서로 좁힌다.
+
 ## 진행 상황
 
 - [x] Java 17, Android Studio, 에뮬레이터 환경 구성
@@ -110,7 +123,12 @@ npm run check:suites
 - [x] 샘플 subflow를 다국어 대응으로 이관 (초기화, 검색 프로모션 닫기)
 - [x] 기사 저장 flow 작성 및 sanity 스위트 실행 성공
 - [x] GitHub Actions workflow 작성 (앱 버전 고정, 여러 버전 matrix 실행 구조)
-- [ ] 고정 버전 APK를 GitHub Release에 업로드 → CI 첫 실행
+- [x] 기사 제목 실행 로그 기록, 정규식 특수문자 이스케이프(`flows/scripts/escape-regex.js`)
+- [x] 고정 버전 APK를 GitHub Release(`app-r50606`)에 업로드 → CI 첫 실행
+- [x] CI 환경 실패("Pixel Launcher isn't responding" 팝업) 대응: 에뮬레이터 안정화 대기·팝업 억제
+- [x] CI에서만 실패하던 저장 flow 수정(모음집 시트를 back으로 닫기) → **CI sanity 통과**
+- [ ] 괄호가 있는 기사 제목으로 정규식 이스케이프 실기기 검증
+- [ ] '새로 들어온 소식' 카드가 없는 날의 처리 방법 결정 (지금은 건너뛰고 pass)
 - [ ] 검색 flow 작성
 
 ## 작성한 flow
@@ -122,10 +140,11 @@ npm run check:suites
 | `subflows/launch-to-home-android.yaml` | subflow | 앱 초기화 → 온보딩 통과 → 메인 홈 | 홈 탭이 선택된 상태(`id` + `selected: true`) |
 | `subflows/launch-clearstate-android.yaml` | subflow | 앱 데이터 초기화 후 실행 | 온보딩 첫 화면 문구(영어/한국어) |
 | `subflows/dismiss-search-promo-android.yaml` | subflow | 검색 위젯 프로모션 바텀시트 닫기 (뜰 때만) | 닫힌 뒤 바텀시트 제목이 사라짐 |
+| `scripts/escape-regex.js` | script | 읽어 온 텍스트를 셀렉터용 정규식으로 이스케이프하고 `maestro.log`에 기록 | - |
 
 ## 배운 점
 
-자세한 과정은 [troubleshooting 7~10번](docs/troubleshooting.md)에 기록했습니다.
+자세한 과정은 [troubleshooting 7~12번](docs/troubleshooting.md)과 [ai-review](docs/ai-review.md)에 기록했습니다.
 
 - **셀렉터는 언어에 의존하지 않게.** 텍스트 셀렉터는 기기 언어가 바뀌면 깨진다. 우선순위는 id > 다국어 정규식(`"Forward|앞으로"`) > 단일 언어 텍스트 > 좌표.
 - **문구는 추측하지 않고 앱에서 확인한다.** 설치된 APK의 문자열 리소스(`aapt2 dump resources`)에서 영어 원문과 한국어 번역을 대조할 수 있다.
@@ -136,4 +155,8 @@ npm run check:suites
 - **확인 스텝은 fail도 확인한다.** 일부러 틀린 조건을 넣어 fail이 나는지 봐야, 그 스텝이 실제로 무언가를 잡아낼 수 있다는 걸 알 수 있다.
 - **pass가 "검증했다"는 뜻은 아니다.** `when`으로 건너뛴 블록도 리포트에는 SUCCESS로 남는다. 로그에서 실제로 실행됐는지 확인한다.
 - **flow 하나가 깨지면 스위트 전체가 멈춘다.** Maestro는 실행 전에 폴더의 모든 YAML을 파싱한다. CI에서는 문법 검사를 먼저 돌린다.
+- **실패는 먼저 분류한다: 앱 / flow / 환경.** CI의 시스템 팝업(런처 ANR)은 환경 실패라 flow가 아니라 workflow에서 막았다. 환경 문제를 flow로 덮으면 진짜 결함까지 가려진다.
+- **로컬 통과 ≠ CI 통과.** 화면 크기가 다르면 같은 탭도 다른 곳을 누른다. 화면 전체 크기의 `touch_outside`는 가운데를 탭하면 CI(pixel_6)에서 바텀시트 안을 눌러 시트가 닫히지 않았다 → 위치에 의존하지 않는 back 키로 바꿨다.
+- **진단은 증거로 확인한다.** 처음에는 "타이밍 문제"로 오진해 대기만 추가했는데, 다음 실행에서 시트가 5초 넘게 닫히지 않는 것으로 드러났다. 스크린샷·hierarchy 좌표·logcat을 맞춰 본 뒤에야 진짜 원인을 찾았다.
+- **로그의 `ERROR`라는 단어에 놀라지 않는다.** 결과는 `[Passed]`/`[Failed]`와 스텝 상태로 판단한다.
 - **웹 자동화 경험이 그대로 통한다.** 모바일 UI hierarchy도 웹 DOM과 같은 트리 구조라, Playwright에서 셀렉터를 잡던 방식이 그대로 적용됐다.
