@@ -136,8 +136,7 @@ CI 결과는 이렇게 확인합니다.
 | flow | 종류 | 내용 | 검증 기준 |
 |---|---|---|---|
 | `saved/article-save.yaml` | sanity, regression | '새로 들어온 소식' 기사 저장 → 저장됨 목록 확인 → 저장 해제 | 저장됨 탭에 읽어 둔 기사 제목이 있음 / 해제 후 사라짐 |
-| `subflows/onboarding-android.yaml` | subflow | 공통 사전 조건 (아래 flow 호출) | - |
-| `subflows/launch-to-home-android.yaml` | subflow | 앱 초기화 → 온보딩 통과 → 메인 홈 | 홈 탭이 선택된 상태(`id` + `selected: true`) |
+| `subflows/launch-to-home-android.yaml` | subflow | **공통 사전 조건.** 앱 초기화 → 온보딩 통과 → 메인 홈 | 홈 탭이 선택된 상태(`id` + `selected: true`) |
 | `subflows/launch-clearstate-android.yaml` | subflow | 앱 데이터 초기화 후 실행 | 온보딩 첫 화면 문구(영어/한국어) |
 | `subflows/dismiss-search-promo-android.yaml` | subflow | 검색 위젯 프로모션 바텀시트 닫기 (뜰 때만) | 닫힌 뒤 바텀시트 제목이 사라짐 |
 | `scripts/escape-regex.js` | script | 읽어 온 텍스트를 셀렉터용 정규식으로 이스케이프하고 `maestro.log`에 기록 | - |

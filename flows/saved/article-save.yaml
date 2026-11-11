@@ -20,7 +20,7 @@ tags:
 # 기사 제목은 매일 바뀌므로 하드코딩하지 않고 copyTextFrom으로 읽어서 사용한다.
 # 읽은 제목은 maestro.log에 "JsConsole: [savedTitle] 원문: …"으로 남는다. (CI에서는 artifact의 maestro.log)
 
-- runFlow: ../subflows/onboarding-android.yaml
+- runFlow: ../subflows/launch-to-home-android.yaml
 
 # '새로 들어온 소식' 카드는 날에 따라 없을 수 있어 스크롤로 찾는다.
 - scrollUntilVisible:

@@ -8,7 +8,7 @@
 - macOS (Apple Silicon), Android 에뮬레이터 `Pixel_10_Pro` (Google Play 이미지)
 - 에뮬레이터 언어: **한국어**
 - 대상 앱: 위키피디아 (`appId: org.wikipedia`)
-- 공통 사전 조건: `flows/subflows/onboarding-android.yaml` (앱 초기화 → 온보딩 통과 → 홈 탭 도착 확인)
+- 공통 사전 조건: `flows/subflows/launch-to-home-android.yaml` (앱 초기화 → 온보딩 통과 → 홈 탭 도착 확인)
 
 ## 폴더 구조
 
