@@ -70,6 +70,43 @@ workflow를 읽다가 헷갈렸던 부분을 정리한 문서입니다. 전체 �
 - `test`는 `needs: prepare`라서 `prepare`가 완전히 끝난 뒤 시작한다. 그 시점에는 값이 이미 채워져 있다.
 - outputs는 **문자열로만** 전달된다. 목록은 JSON 문자열로 보내고 받는 쪽에서 `fromJSON`으로 푼다. 덕분에 `ci/app-versions.json`에 버전을 추가하기만 하면 workflow 수정 없이 병렬 job이 늘어난다.
 
+### `needs`는 어디서 선언하나
+
+`test` job의 `needs: prepare` 한 줄이다. 역할은 두 가지다.
+
+1. **실행 순서**: `prepare`가 성공해야 `test`가 시작된다.
+2. **값 받기**: GitHub Actions가 `needs` 컨텍스트를 채워 주어 `${{ needs.prepare.outputs.* }}`로 읽을 수 있다.
+
+`needs.`는 직접 만든 변수가 아니라 `steps.`, `env.`, `matrix.`, `github.`처럼 **GitHub Actions 기본 컨텍스트**다. 단, `needs:`에 적은 job만 들어간다 (`needs:`가 없으면 `needs.prepare`는 비어 있다).
+
+### `fromJSON`은 지정이 아니라 **파싱**
+
+JSON 형식의 **문자열을 실제 목록·객체로 바꾼다.** `prepare`가 보내는 값은 이런 문자열이다.
+
+```
+versions = '[{"id":"r50606","versionName":"r/50606-r-2026-09-09","apkUrl":"https://...","sha256":"eba8...","enabled":true}]'
+```
+
+문자열 그대로는 matrix가 목록으로 쓸 수 없다. `fromJSON(...)`으로 파싱하면 원소 1개짜리 목록이 되고, matrix는 **원소마다 job을 하나씩** 만든다.
+
+### `matrix.app`
+
+matrix가 만든 job마다 목록의 원소 하나가 `matrix.app`에 들어간다. 원소가 객체라 필드를 꺼내 쓴다.
+
+| 표현 | 값 (r50606 job) |
+|---|---|
+| `matrix.app.id` | `r50606` |
+| `matrix.app.versionName` | `r/50606-r-2026-09-09` |
+| `matrix.app.apkUrl` | APK 다운로드 주소 |
+| `matrix.app.sha256` | APK 검증값 |
+
+```yaml
+name: ${{ needs.prepare.outputs.suite }} · ${{ matrix.app.id }}
+# → "sanity · r50606"
+```
+
+`ci/app-versions.json`에 버전이 하나 더 생기면 Actions 화면에 `sanity · r50606`, `sanity · <새 id>`처럼 job이 나란히 생긴다. 이름에 `matrix.app.id`를 넣은 것은 어느 버전의 job인지 구분하기 위해서다.
+
 ---
 
 ## 3. YAML 문법 검사 한 줄 풀이
