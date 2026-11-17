@@ -384,3 +384,118 @@ CI sanity가 `[Passed]`로 끝났는데 로그 곳곳에 `ERROR`, `WARNING`, `fa
 **배운 점**
 - 로그의 `ERROR`/`WARNING` 단어가 아니라 **테스트 결과 줄과 스텝 상태**로 판단한다.
 - 반대로, 처음 보는 메시지가 실패 직전에 나왔다면 이 표에 없는지 확인하고, 새로 확인한 것은 이 표에 추가한다.
+
+---
+
+## 13. `inputText: "AI"`가 "먀"로 입력됨 (로컬 키보드가 한국어 자판 상태)
+
+**분류: 환경 문제 (로컬)** — 앱·flow 결함이 아니다. CI(영어 에뮬레이터)에서는 생기지 않는다.
+
+**증상** (2026-11-17)
+검색창에 `inputText: "AI"`를 했는데 입력란에 **"먀"**가 들어가고, "먀오리현" 같은 엉뚱한 결과가 나왔다.
+
+**원인**
+- Maestro의 `inputText`는 키 입력을 **현재 키보드(IME)**를 거쳐 보낸다.
+- 에뮬레이터의 Gboard가 **한국어 두벌식** 상태라 A→ㅁ, I→ㅑ로 조합되어 "먀"가 됐다.
+- 설치된 키보드는 Gboard 하나, 입력 언어는 2개(한국어 `-1906255757`, 영어 `1594443099`)가 켜져 있었다. 이 Gboard에는 언어 전환(지구본) 키가 없었다.
+- CLAUDE.md의 "검색어는 영어로 시작한다"는 영어 입력은 된다는 전제였는데, **자판이 한국어면 영어도 깨진다.**
+
+**해결 (로컬 에뮬레이터 설정)**
+```bash
+# 현재 입력 언어 확인
+adb shell settings get secure selected_input_method_subtype
+# 영어 입력으로 전환 후 키보드 다시 선택
+adb shell settings put secure selected_input_method_subtype 1594443099
+adb shell ime set com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME
+```
+- 확인: 키보드 스페이스바에 "English"가 표시되고, `inputText: "AI"`가 그대로 입력된다.
+- 되돌리기: 위 값을 `-1906255757`(한국어)로 바꾼다.
+- 값(숫자)은 기기·Gboard 버전마다 다를 수 있다. `enabled_input_methods`에서 확인한다:
+  `adb shell settings get secure enabled_input_methods`
+
+**flow 쪽 대비**
+`flows/subflows/search-android.yaml`은 입력 직후 `assertVisible: id search_src_text + text ${QUERY}`로 **입력값을 확인**한다. 자판이 다시 한국어로 바뀌면 엉뚱한 결과로 진행하지 않고 이 스텝에서 바로 실패한다.
+
+**배운 점**
+- "입력이 됐다(COMPLETED)"와 "의도한 값이 들어갔다"는 다르다. 입력 스텝 뒤에는 입력값을 확인한다.
+- 기기 언어(한국어)와 키보드 입력 언어는 별개다. 로컬과 CI의 차이는 언어뿐 아니라 키보드 상태에도 있다.
+
+---
+
+## 14. `npm run test:tag -- saved` → `Could not find flows needed for execution in order`
+
+**증상** (2026-11-17)
+```
+Could not find flows needed for execution in order: AI 검색 → 첫 번째 결과 열기 → 같은 제목의 기사 확인
+```
+sanity 전체 실행은 되는데, 저장 케이스만 태그로 골라 실행하면 아무 flow도 시작되지 않고 예외로 멈췄다.
+
+**원인**
+- `flows/config.yaml`의 `executionOrder.flowsOrder`에 검색 → 저장 순서를 적어 두었다.
+- `--include-tags=saved`로 실행하면 검색 케이스가 태그 필터로 빠진다.
+- Maestro(2.12.1)는 **순서 목록의 flow가 하나라도 실행 대상에 없으면 예외로 실행을 멈춘다.**
+  (목록의 이름이 **하나도** 맞지 않을 때는 예외 없이 기본 순서로 실행됐다 → 처음 실험에서 이 경우만 확인해서 놓쳤다)
+
+**확인 (임시 flow 2개로 재현)**
+
+| 실행 | 결과 |
+|---|---|
+| 순서 config + `--include-tags=sanity` (두 flow 모두 포함) | 순서대로 통과 |
+| 순서 config + `--include-tags=saved` (하나만 포함) | `IllegalStateException: Could not find flows needed for execution in order` |
+| `--config <순서 없는 설정>` + `--include-tags=saved` | 통과 |
+| 순서 없는 설정을 `flows/` 밖에 두고 `flows: ["**"]` | 하위 폴더까지 정상 탐색 (경로는 실행 대상 폴더 기준) |
+
+**해결**
+- 스위트 실행(test:sanity / test:regression, CI): 순서가 있는 `flows/config.yaml` 그대로.
+- 태그 지정 실행(test:tag): 순서 없는 `config/tag-run.yaml`을 `--config`로 지정.
+- 재발 방지: `npm run check:suites`가 **순서 목록의 flow에 sanity 태그가 있는지** 검사한다. sanity가 없으면 sanity 실행에서 같은 예외가 난다. (sanity ⊂ regression이라 sanity가 있으면 두 스위트 모두에 포함된다)
+
+**배운 점**
+- 설정 하나가 모든 실행 방식(스위트 / 태그 / 단일 파일)에 공통으로 적용된다. 설정을 추가하면 **각 실행 방식으로 한 번씩** 확인한다.
+- 실험은 "정상 경우"만이 아니라 "일부만 맞는 경우"까지 해 본다.
+
+---
+
+## 15. `npm run test:tag -- saved`가 바로 끝남 (`Success`만 보이고 flow가 0.1초 만에 실패)
+
+**증상** (2026-11-17)
+```
+Success
+Waiting for flows to complete...
+[Failed] AI 검색 첫 결과 기사 저장 → 저장됨 목록 확인 → 저장 해제 (66ms)
+```
+- `Success`는 테스트 결과가 아니라 앱 데이터 초기화(`adb shell pm clear`)의 출력이다. → 헷갈리지 않게 `reset:app`이 `[reset:app] 앱 데이터 초기화` 줄을 먼저 출력하도록 바꿨다.
+- flow가 수십 ms 만에 실패했다면 앱 화면까지 가지도 못한 것이다.
+
+**원인 (maestro.log)**
+```
+maestro.android.DeviceServerDiedException: Device server died during 'deviceInfo' on emulator-5554
+Caused by: io.grpc.StatusRuntimeException: UNAVAILABLE
+```
+- 실행 계획은 정상이었다 (`flowsToRun=[…/flows/saved/article-save.yaml]`). 설정(`--config`)·초기화(`pm clear`) 문제가 아니라, Maestro가 기기 안에 띄우는 **드라이버(`dev.mobile.maestro`)와의 연결이 끊긴 것**이다.
+- **같은 에뮬레이터를 다른 Maestro 세션이 동시에 쓰고 있었다.** 기기 logcat(`adb logcat -d -v time`)의 순서:
+
+  | 시각 | 기기에 들어온 요청 | 누가 |
+  |---|---|---|
+  | 11:53:36~39 | `pm grant …` → `am force-stop` → 앱 실행 | 다른 Maestro 세션의 `launchApp` |
+  | 11:53:39~48 | Maestro 드라이버가 hierarchy 읽는 중 | 같은 세션 |
+  | 11:53:41 | `pm clear org.wikipedia` | 이번 실행의 `reset:app` |
+  | 11:53:43 | 드라이버 연결 직후 끊김 | 이번 실행 |
+
+- 기기 안의 Maestro 드라이버는 **한 번에 한 세션만** 처리한다. 다른 세션이 쓰는 중에 새로 연결하면 곧바로 끊긴다. 겹친 다른 세션이 무엇이었는지는 확인하지 못했다.
+- 다른 실행이 끝난 뒤 한 번만 실행하자 정상 통과했다.
+
+**대처**
+1. 다른 Maestro 실행(다른 터미널의 `maestro test`/npm 스크립트, `maestro hierarchy`, Maestro Studio, IDE 확장, MCP 등)이 없는지 확인하고, 끝난 뒤 한 번만 실행한다.
+   - 기기 쪽 확인: `adb logcat -d -v time | grep "adbd service requested"` → 내 실행 직전에 `pm grant …`/`am force-stop`이 있으면 다른 세션이 앱을 실행한 것이다.
+2. 같은 명령을 한 번 더 실행한다.
+3. 계속되면 드라이버를 멈추고 다시 실행한다 (다음 실행 때 Maestro가 다시 띄운다).
+   ```bash
+   adb shell am force-stop dev.mobile.maestro
+   adb shell am force-stop dev.mobile.maestro.test
+   ```
+4. 그래도 안 되면 에뮬레이터를 재시작한다.
+
+**구분법**
+- 수십 ms~1초 안에 `[Failed]` → 기기 연결·드라이버 문제(특히 **실행 겹침**)일 가능성이 높다. `maestro.log`에서 `Exception`을 찾는다.
+- 몇 초 이상 진행 후 `[Failed]` → flow나 앱 문제. 실패 스텝과 스크린샷을 본다.

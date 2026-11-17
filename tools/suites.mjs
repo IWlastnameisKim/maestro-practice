@@ -9,6 +9,10 @@
 //     - 플랫폼 태그 android
 //   subflow     = flows/subflows/**/*.yaml
 //     - 스위트 태그를 달지 않는다 (단독 실행 방지)
+//   실행 순서   = flows/config.yaml 의 executionOrder.flowsOrder
+//     - 적힌 이름이 실제 테스트 flow의 name: 과 정확히 하나씩 일치해야 한다 (Maestro는 name으로 찾는다)
+//     - 그 flow는 sanity 태그가 있어야 한다. 목록의 flow가 태그 필터로 하나라도 빠지면
+//       Maestro가 실행 자체를 예외로 멈추기 때문 (sanity ⊂ regression → 두 스위트 모두 포함)
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -22,6 +26,21 @@ function walk(dir) {
     const p = join(dir, name);
     return statSync(p).isDirectory() ? walk(p) : p.endsWith(".yaml") ? [p] : [];
   });
+}
+
+// '---' 앞의 헤더에서 name을 읽는다.
+function readName(file) {
+  const header = readFileSync(file, "utf8").split(/^---\s*$/m)[0];
+  const m = header.match(/^name:\s*(.+?)\s*$/m);
+  return m ? m[1].replace(/^["']|["']$/g, "") : null;
+}
+
+// config.yaml 의 executionOrder.flowsOrder 목록을 읽는다.
+function readFlowsOrder() {
+  const text = readFileSync(join(ROOT, "config.yaml"), "utf8");
+  const block = text.match(/^[ \t]+flowsOrder:\s*\n((?:[ \t]+-.*\n?)+)/m);
+  if (!block) return [];
+  return block[1].split("\n").map((l) => l.replace(/^[ \t]+-\s*/, "").trim().replace(/^["']|["']$/g, "")).filter(Boolean);
 }
 
 // '---' 앞의 헤더에서 tags만 읽는다. (블록 리스트 / [a, b] 인라인 둘 다 지원)
@@ -50,11 +69,21 @@ for (const file of walk(ROOT).sort()) {
     continue;
   }
 
-  rows.push({ file: rel, feature: parts.length > 1 ? parts[0] : "-", tags });
+  rows.push({ file: rel, feature: parts.length > 1 ? parts[0] : "-", tags, name: readName(file) });
   if (parts.length === 1) errors.push(`${file}: 기능 폴더 밖에 있음 → flows/<기능>/ 아래로 옮길 것`);
   if (!SUITES.some(has)) errors.push(`${file}: 스위트 태그(sanity/regression)가 없음 → 어떤 스위트에서도 실행되지 않음`);
   if (has("sanity") && !has("regression")) errors.push(`${file}: sanity인데 regression 태그가 없음`);
   if (!has("android")) errors.push(`${file}: 플랫폼 태그(android)가 없음`);
+}
+
+// 실행 순서(flowsOrder) 이름 검사
+const order = readFlowsOrder();
+for (const n of order) {
+  const hits = rows.filter((r) => r.name === n);
+  if (hits.length === 0) errors.push(`config.yaml flowsOrder: "${n}" 와 name이 같은 테스트 flow가 없음`);
+  if (hits.length === 1 && !hits[0].tags.includes("sanity"))
+    errors.push(`config.yaml flowsOrder: ${hits[0].file} 에 sanity 태그가 없음 → sanity 실행에서 빠져 순서 지정 예외로 스위트 전체가 멈춤`);
+  if (hits.length > 1) errors.push(`config.yaml flowsOrder: "${n}" 와 name이 같은 flow가 ${hits.length}개 (${hits.map((h) => h.file).join(", ")})`);
 }
 
 const mark = (b) => (b ? "O" : "");
@@ -65,6 +94,13 @@ for (const r of rows) {
   console.log(`| ${r.file} | ${r.feature} | ${mark(r.tags.includes("sanity"))} | ${mark(r.tags.includes("regression"))} | ${others} |`);
 }
 const count = (t) => rows.filter((r) => r.tags.includes(t)).length;
+if (order.length) {
+  console.log("\n실행 순서 (config.yaml flowsOrder, 목록에 없는 flow는 그 뒤에 기본 순서)");
+  order.forEach((n, i) => {
+    const hit = rows.find((r) => r.name === n);
+    console.log(`  ${i + 1}. ${hit ? hit.file : "(일치하는 flow 없음)"} — ${n}`);
+  });
+}
 console.log(`\n테스트 flow ${rows.length}개 · sanity ${count("sanity")}개 · regression ${count("regression")}개`);
 
 if (errors.length) {

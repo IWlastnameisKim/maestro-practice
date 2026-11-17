@@ -41,9 +41,12 @@ maestro-practice/
 │   ├── config.yaml              # 하위 폴더까지 탐색 (flows: ["**"])
 │   ├── saved/                   # 기능별 테스트 본체 (태그로 스위트 지정)
 │   │   └── article-save.yaml
+│   ├── search/
+│   │   └── search-open-first-result.yaml
 │   ├── subflows/                # 초기 조건 세팅용 재사용 flow (단독 실행 안 함)
 │   └── scripts/                 # runScript로 호출하는 JS (예: escape-regex.js)
-├── tools/suites.mjs             # 스위트 구성 표 출력 / 태깅 규칙 검사
+├── config/tag-run.yaml          # 태그 지정 실행용 Maestro 설정 (실행 순서 없음)
+├── tools/suites.mjs             # 스위트 구성 표 출력 / 태깅 규칙·실행 순서 검사
 ├── ci/app-versions.json         # CI에서 테스트할 앱 버전 목록 (APK URL + sha256)
 ├── .github/workflows/maestro.yml
 ├── docs/
@@ -77,6 +80,13 @@ npm run check:suites
 ```
 
 > 태그 없이 `maestro test flows`를 실행하면 subflows까지 단독 실행되므로 쓰지 않습니다.
+
+**실행 방식**
+
+- npm 스크립트는 테스트 전에 앱 데이터를 **한 번** 초기화합니다(`npm run reset:app`). 그래서 온보딩은 스위트의 첫 flow에서만 지나가고, 다음 flow부터는 앱만 다시 실행해 홈에서 시작합니다.
+- 스위트 실행(`test:sanity` / `test:regression`, CI)은 [flows/config.yaml](flows/config.yaml)의 `executionOrder`로 순서를 고정합니다 (검색 → 저장). `continueOnFailure: true`라 앞 케이스가 실패해도 **모든 케이스가 리포트에 집계**됩니다.
+- 태그 지정 실행(`test:tag`)은 순서 없는 [config/tag-run.yaml](config/tag-run.yaml)을 씁니다. 순서 목록의 flow가 태그로 걸러져 빠지면 Maestro가 실행을 멈추기 때문입니다 ([troubleshooting 14번](docs/troubleshooting.md)).
+- 케이스(flow)는 서로 기대지 않습니다. 순서와 관계없이 혼자 실행해도 통과해야 합니다.
 
 ## 태깅 규칙
 
@@ -131,22 +141,24 @@ workflow 파일의 각 부분이 무엇을 하는지는 [docs/ci-workflow.md](do
 - [x] CI 환경 실패("Pixel Launcher isn't responding" 팝업) 대응: 에뮬레이터 안정화 대기·팝업 억제
 - [x] CI에서만 실패하던 저장 flow 수정(모음집 시트를 back으로 닫기) → **CI sanity 통과**
 - [ ] 괄호가 있는 기사 제목으로 정규식 이스케이프 실기기 검증
-- [ ] '새로 들어온 소식' 카드가 없는 날의 처리 방법 결정 (지금은 건너뛰고 pass)
-- [ ] 검색 flow 작성
+- [x] 검색 flow 작성 ("AI" 검색 → 첫 결과 기사 확인), 검색 subflow 분리
+- [x] 기사 저장 flow를 '새로 들어온 소식' 카드 대신 검색 결과 기반으로 변경 (카드가 없는 날 조용히 pass되던 문제 해소)
+- [ ] 홈 화면 '새로 들어온 소식' UI 확인 flow (API 응답 연동 후 재구성)
 
 ## 작성한 flow
 
 | flow | 종류 | 내용 | 검증 기준 |
 |---|---|---|---|
-| `saved/article-save.yaml` | sanity, regression | '새로 들어온 소식' 기사 저장 → 저장됨 목록 확인 → 저장 해제 | 저장됨 탭에 읽어 둔 기사 제목이 있음 / 해제 후 사라짐 |
-| `subflows/launch-to-home-android.yaml` | subflow | **공통 사전 조건.** 앱 초기화 → 온보딩 통과 → 메인 홈 | 홈 탭이 선택된 상태(`id` + `selected: true`) |
-| `subflows/launch-clearstate-android.yaml` | subflow | 앱 데이터 초기화 후 실행 | 온보딩 첫 화면 문구(영어/한국어) |
-| `subflows/dismiss-search-promo-android.yaml` | subflow | 검색 위젯 프로모션 바텀시트 닫기 (뜰 때만) | 닫힌 뒤 바텀시트 제목이 사라짐 |
+| `saved/article-save.yaml` | sanity, regression | "AI" 검색 첫 결과 기사 저장 → 저장됨 목록 확인 → 저장 해제 | 저장됨 탭에 읽어 둔 기사 제목이 있음 / 해제 후 사라짐 |
+| `search/search-open-first-result.yaml` | sanity, regression | "AI" 검색 → 첫 결과 열기 | 입력란에 검색어 그대로 / 결과 1개 이상 / 열린 기사에 같은 제목 |
+| `subflows/launch-to-home-android.yaml` | subflow | **공통 사전 조건.** 앱 실행 → (스위트 첫 flow면) 온보딩 통과 → 메인 홈 | 온보딩 첫 화면 문구(첫 flow만) / 홈 탭이 선택된 상태(`id` + `selected: true`) |
+| `subflows/search-android.yaml` | subflow | 검색 탭 → 검색어(`QUERY`) 입력 → 결과 목록까지 | 입력란에 검색어가 그대로 들어감 / 결과 1개 이상 |
+| `subflows/dismiss-search-promo-android.yaml` | subflow | 검색 위젯 프로모션 바텀시트 닫기 (뜰 때만, back) | 닫힌 뒤 바텀시트 제목이 사라짐 |
 | `scripts/escape-regex.js` | script | 읽어 온 텍스트를 셀렉터용 정규식으로 이스케이프하고 `maestro.log`에 기록 | - |
 
 ## 배운 점
 
-자세한 과정은 [troubleshooting 7~12번](docs/troubleshooting.md)과 [ai-review](docs/ai-review.md)에 기록했습니다.
+자세한 과정은 [troubleshooting 7~13번](docs/troubleshooting.md)과 [ai-review](docs/ai-review.md)에 기록했습니다.
 
 - **셀렉터는 언어에 의존하지 않게.** 텍스트 셀렉터는 기기 언어가 바뀌면 깨진다. 우선순위는 id > 다국어 정규식(`"Forward|앞으로"`) > 단일 언어 텍스트 > 좌표.
 - **문구는 추측하지 않고 앱에서 확인한다.** 설치된 APK의 문자열 리소스(`aapt2 dump resources`)에서 영어 원문과 한국어 번역을 대조할 수 있다.

@@ -1,0 +1,11 @@
+# Maestro 워크스페이스 설정 — 태그 지정 실행용 (npm run test:tag)
+#
+# flows/config.yaml과 같지만 실행 순서(executionOrder)가 없다.
+#   이유: flowsOrder에 적힌 flow가 태그 필터로 하나라도 빠지면 Maestro가
+#         "Could not find flows needed for execution in order: …" 예외로 실행 자체를 멈춘다. (2.12.1에서 확인)
+#         예) npm run test:tag -- saved → 순서 목록의 검색 케이스가 빠져서 실패
+#   그래서 일부 flow만 고르는 태그 실행은 순서 없이 돌린다.
+# 이 파일은 flows/ 밖에 둔다. flows/ 안에 두면 flow로 읽힌다.
+# flows 경로는 이 파일 위치가 아니라 실행 대상 폴더(flows/) 기준이다.
+flows:
+  - "**"

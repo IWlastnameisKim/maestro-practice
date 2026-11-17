@@ -1,0 +1,38 @@
+appId: org.wikipedia
+---
+# 검색 탭에서 검색어를 입력해 결과 목록이 뜬 상태까지 만든다.
+# 입력 (env)
+#   QUERY  검색어. 영어로 쓴다 (CLAUDE.md: Android inputText 한글 입력 불안정)
+#          입력 확인 셀렉터에 정규식으로 쓰이므로 괄호 등 특수문자는 넣지 않는다.
+# 호출 전 상태: 하단 탭이 보이는 메인 화면 (예: launch-to-home-android.yaml 직후)
+# 호출 후 상태: 검색 화면, 입력란에 QUERY, 결과 목록 1개 이상
+#
+# 셀렉터 출처 (2026-11-17, 앱 r/50606, 로컬 한국어 에뮬레이터 maestro hierarchy)
+#   id: nav_tab_search            하단 '검색' 탭
+#   id: search_card               검색 탭 상단의 검색창 (탭하면 입력 화면)
+#   id: search_src_text           입력란 (열리면 포커스됨)
+#   id: fragment_search_results   결과 목록 영역. 항목은 Compose라 resource-id가 없다 (docs/ai-review.md 기록)
+# 검색은 선택된 언어의 위키백과에서 한다 (로컬 ko, CI en) → 결과 내용은 환경마다 다르다.
+
+- tapOn:
+    id: "org.wikipedia:id/nav_tab_search"
+- runFlow: dismiss-search-promo-android.yaml
+
+- tapOn:
+    id: "org.wikipedia:id/search_card"
+- inputText: ${QUERY}
+
+# 입력란에 검색어가 그대로 들어갔는지 확인한다.
+#   키보드가 한국어 자판 상태면 "AI"가 "먀"로 입력된다 (docs/troubleshooting.md 13번).
+#   여기서 확인하지 않으면 엉뚱한 검색 결과로 다음 스텝이 진행된다.
+- assertVisible:
+    id: "org.wikipedia:id/search_src_text"
+    text: ${QUERY}
+
+# 결과 목록에 항목이 1개 이상 뜰 때까지 대기 (네트워크 응답)
+- extendedWaitUntil:
+    visible:
+      text: ".+"
+      childOf:
+        id: "org.wikipedia:id/fragment_search_results"
+    timeout: 15000

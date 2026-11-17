@@ -5,3 +5,22 @@
 #   그래서 실행은 항상 npm 스크립트(태그 지정)로 한다.
 flows:
   - "**"
+
+# 실행 순서 (2026-11-17)
+# - flowsOrder는 파일 이름이 아니라 각 flow의 `name:` 값으로 찾는다. (Maestro 2.12.1에서 확인)
+#   flow의 name을 바꾸면 여기도 같이 바꾼다. `npm run check:suites`가 이름이 맞는지 검사한다.
+# - 목록의 flow가 태그 필터로 **하나라도 빠지면 실행 자체가 예외로 멈춘다**
+#   ("Could not find flows needed for execution in order"). 그래서
+#     · 이 설정은 스위트 실행(test:sanity / test:regression, CI)에만 쓴다.
+#     · 목록의 flow는 모두 sanity 태그를 단다 (sanity ⊂ regression이라 두 스위트 모두에 포함됨, check:suites가 검사).
+#     · 태그 지정 실행(test:tag)은 순서 없는 config/tag-run.yaml을 쓴다.
+#   (목록의 이름이 하나도 맞지 않을 때는 예외 없이 기본 순서로 실행된다 — 2.12.1에서 확인)
+# - 여기 없는 flow는 목록의 flow들 다음에 실행된다.
+# - continueOnFailure: true → 앞 케이스가 실패해도 다음 케이스를 실행해 모든 케이스가 리포트에 집계된다.
+#   (false면 실패 이후 flow는 실행도, 집계도 되지 않는다)
+#   각 flow는 launch-to-home으로 앱을 다시 실행해 홈에서 시작하므로 앞 flow의 실패 화면에 영향받지 않는다.
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - AI 검색 → 첫 번째 결과 열기 → 같은 제목의 기사 확인
+    - AI 검색 첫 결과 기사 저장 → 저장됨 목록 확인 → 저장 해제

@@ -8,7 +8,8 @@
 - macOS (Apple Silicon), Android 에뮬레이터 `Pixel_10_Pro` (Google Play 이미지)
 - 에뮬레이터 언어: **한국어**
 - 대상 앱: 위키피디아 (`appId: org.wikipedia`)
-- 공통 사전 조건: `flows/subflows/launch-to-home-android.yaml` (앱 초기화 → 온보딩 통과 → 홈 탭 도착 확인)
+- 공통 사전 조건: `flows/subflows/launch-to-home-android.yaml` (앱 실행 → 처음이면 온보딩 통과 → 홈 탭 도착 확인)
+  - 앱 데이터 초기화는 flow마다 하지 않고 npm 스크립트가 **스위트 시작 전에 한 번** 한다 (`npm run reset:app`). 그래서 온보딩은 스위트의 첫 flow에서만 나온다.
 
 ## 폴더 구조
 
@@ -17,7 +18,8 @@
 - `flows/<기능>/*.yaml` — 테스트 본체 (예: `flows/search/`, `flows/saved/`). 기능 폴더 밖에 두지 않는다.
 - `flows/subflows/` — 초기 조건 세팅용 재사용 flow. 테스트 본체가 `runFlow`로 불러 쓰며, 단독으로 실행하지 않는다.
 - `flows/scripts/` — `runScript`로 호출하는 JS
-- `flows/config.yaml` — 하위 폴더까지 탐색하도록 설정 (`flows: ["**"]`)
+- `flows/config.yaml` — 하위 폴더까지 탐색하도록 설정 (`flows: ["**"]`) + 스위트 실행 순서
+- `config/tag-run.yaml` — 태그 지정 실행용 설정 (실행 순서 없음). `flows/` 안에 두면 flow로 읽히므로 밖에 둔다.
 - `package.json` — 스위트별 실행 명령
 - `tools/suites.mjs` — 스위트 구성 표 출력 / 태깅 규칙 검사
 - `samples/` — `maestro download-samples`로 받은 공식 샘플. **수정하지 않고, 커밋하지 않는다.**
@@ -41,6 +43,10 @@
 - 태그 지정: `npm run test:tag -- <태그>` (예: `npm run test:tag -- search`)
 - 구성 확인: `npm run list:suites` / 규칙 검사: `npm run check:suites`
 - **태그 없이 `maestro test flows`를 실행하지 않는다.** subflows까지 단독 실행된다.
+- npm을 거치지 않고 `maestro test <파일>`로 직접 실행하면 앱 데이터가 초기화되지 않는다. 깨끗한 상태가 필요하면 먼저 `npm run reset:app`.
+- 실행 순서는 `flows/config.yaml`의 `executionOrder.flowsOrder`로 정한다. **flow의 `name:`으로 연결**되므로 name을 바꾸면 여기도 고친다 (`check:suites`가 검사).
+  - 순서 목록의 flow가 태그 필터로 하나라도 빠지면 Maestro가 실행을 예외로 멈춘다. 그래서 순서 목록에는 **sanity 태그가 있는 flow만** 넣고, `test:tag`는 순서 없는 `config/tag-run.yaml`을 쓴다.
+- 각 flow는 다른 flow의 결과에 기대지 않는다. 순서는 실행 흐름을 위한 것이고, 어떤 flow든 혼자 실행해도 통과해야 한다.
 - CI(GitHub Actions) 에뮬레이터는 **영어**, 로컬은 **한국어**다. 텍스트 셀렉터는 반드시 영어·한국어를 함께 쓴다.
 
 ## CI (GitHub Actions)
@@ -98,6 +104,7 @@
 ## 알려진 주의점
 
 - Android에서 `inputText`로 한글 입력이 잘 안 될 수 있다. 검색어는 영어로 시작한다.
+  - 단, 로컬 에뮬레이터 키보드(Gboard)가 한국어 자판이면 영어도 한글로 조합된다 ("AI" → "먀"). 입력 언어를 영어로 둔다 (`docs/troubleshooting.md` 13번). 입력 스텝 뒤에는 입력값을 확인한다.
 - `runFlow` 경로는 호출하는 flow 파일의 위치를 기준으로 한다.
   - 테스트 본체(`flows/<기능>/x.yaml`) → `../subflows/xxx.yaml`, `../scripts/xxx.js`
   - subflow끼리 → `xxx.yaml` (같은 폴더)

@@ -16,8 +16,8 @@ appId: org.wikipedia
       visible: "A Faster way to Search|더 빠른 검색 방법"
     label: 검색 위젯 프로모션 바텀시트가 떠 있으면 닫기
     commands:
-      # touch_outside는 화면 전체를 덮는 바텀시트 바깥 영역이다.
-      # 요소 중앙(화면 중앙)을 탭하며, 이 위치는 바텀시트 위쪽 빈 영역이라 시트가 닫힌다.
-      - tapOn:
-          id: "org.wikipedia:id/touch_outside"
+      # back으로 닫는다. (2026-11-17 로컬 확인: 시트만 닫히고 검색 탭에 남는다)
+      #   touch_outside를 탭하지 않는 이유: 화면 전체 크기라 Maestro가 탭하는 가운데 지점이
+      #   화면이 짧은 기기(CI pixel_6)에서는 시트 안에 떨어질 수 있다. (저장 시트에서 실제로 CI 실패, docs/ai-review.md)
+      - pressKey: back
       - assertNotVisible: "A Faster way to Search|더 빠른 검색 방법"
